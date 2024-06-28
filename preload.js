@@ -1,12 +1,4 @@
-/**
- * The preload script runs before `index.html` is loaded
- * in the renderer. It has access to web APIs as well as
- * Electron's renderer process modules and some polyfilled
- * Node.js functions.
- *
- * https://www.electronjs.org/docs/latest/tutorial/sandboxF
- */
-const { contextBridge, ipcRenderer } = require('electron')
+const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   screenInfo: () => ipcRenderer.invoke('init-position'),
@@ -14,9 +6,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   submitMessage: (type, message) => ipcRenderer.send('submit-message', type, message),
   onReceiveMessage: (callback) => ipcRenderer.on('message', (_event, message) => callback(message)),
   onShow: (callback) => ipcRenderer.on('show', (_event) => callback()),
-})
+  startVoiceCommand: (callback) => ipcRenderer.on('start-voice-command', (_event) => callback())
+});
 
 ipcRenderer.on('petPosition', (event, newPosition) => {
   window.dispatchEvent(new CustomEvent('petPosition', { detail: newPosition }));
 });
-  

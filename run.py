@@ -5,9 +5,9 @@ import sys
 import time
 import psutil
 
-subprocess.Popen(['poetry', 'run', 'flask', '--app',
-                 'server', 'run'], shell=True)
-subprocess.Popen(['npm', 'run', 'start'], shell=True)
+# Use shell=False for better compatibility
+subprocess.Popen(['poetry', 'run', 'flask', '--app', 'server', 'run'])
+subprocess.Popen(['npm', 'run', 'start'])
 
 try:
     while True:

@@ -1,18 +1,12 @@
-// Modules to control application life and create native browser window
 const { app, BrowserWindow, screen, ipcMain, globalShortcut } = require("electron");
 const path = require("node:path");
-const { conversation, screenshot } = require('./apiService');
-const io = require('socket.io-client');
-const config = require("./config")
+const fs = require("fs");
+const axios = require("axios");
+const FormData = require("form-data");
+require('dotenv').config();
+const config = require("./config");
 
-const socket = io('http://127.0.0.1:5000');
-socket.on('directory', (response) => {
-  showMessage(response.data)
-});
-
-socket.on('screenshot', (response) => {
-  showMessage(response.data.initial_response)
-});
+const { ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID } = process.env;
 
 var petWindow;
 var chatboxInputWindow;
@@ -21,48 +15,48 @@ var petOrientation = 1;
 
 function getPetWindowSize() {
   const primaryDisplay = screen.getPrimaryDisplay();
-  const petWindowHeight = 272 * config.SCALE
-  const petWindowWidth = 272 * config.SCALE
+  const petWindowHeight = 272 * config.SCALE;
+  const petWindowWidth = 272 * config.SCALE;
   const petWindowSize = {
     width: petWindowWidth,
-    height: petWindowHeight
-  }
+    height: petWindowHeight,
+  };
 
-  return petWindowSize
+  return petWindowSize;
 }
 
 function petStepHandler(event, dx, dy) {
-  const webContents = event.sender
-  const win = BrowserWindow.fromWebContents(webContents)
-  const petWindowSize = getPetWindowSize()
+  const webContents = event.sender;
+  const win = BrowserWindow.fromWebContents(webContents);
+  const petWindowSize = getPetWindowSize();
   const screenSize = screen.getPrimaryDisplay().workAreaSize;
 
-  let newX = win.getPosition()[0] + dx
-  let newY = win.getPosition()[1] + dy
+  let newX = win.getPosition()[0] + dx;
+  let newY = win.getPosition()[1] + dy;
 
-  const minX = Math.floor(petWindowSize.width * 0.3) - petWindowSize.width
-  const maxX = screenSize.width - Math.floor(petWindowSize.width * 0.3)
+  const minX = Math.floor(petWindowSize.width * 0.3) - petWindowSize.width;
+  const maxX = screenSize.width - Math.floor(petWindowSize.width * 0.3);
 
-  const minY = Math.floor(petWindowSize.height * 0.3) - petWindowSize.height
-  const maxY = screenSize.height - Math.floor(petWindowSize.height * 0.3)
+  const minY = Math.floor(petWindowSize.height * 0.3) - petWindowSize.height;
+  const maxY = screenSize.height - Math.floor(petWindowSize.height * 0.3);
 
   if (newX > maxX) {
-    newX = minX
+    newX = minX;
   } else if (newX < minX) {
-    newX = maxX
+    newX = maxX;
   }
 
   if (newY > maxY) {
-    newY = minY
+    newY = minY;
   } else if (newY < minY) {
-    newY = maxY
+    newY = maxY;
   }
 
   win.setBounds({
     width: petWindowSize.width,
     height: petWindowSize.height,
     x: newX,
-    y: newY
+    y: newY,
   });
 
   webContents.send('petPosition', { x: newX, y: newY });
@@ -70,26 +64,25 @@ function petStepHandler(event, dx, dy) {
   if (petWindow.getPosition()[0] + getPetWindowSize().width > screen.getPrimaryDisplay().workAreaSize.width) {
     return {
       type: "set-orientation",
-      value: -1
-    }
-  }
-  else if(petWindow.getPosition()[0] < 0) {
+      value: -1,
+    };
+  } else if (petWindow.getPosition()[0] < 0) {
     return {
       type: "set-orientation",
-      value: 1
-    }
+      value: 1,
+    };
   }
-  
-  return {}
+
+  return {};
 }
 
 function initPositionHandler(event) {
-  const webContents = event.sender
-  const win = BrowserWindow.fromWebContents(webContents)
+  const webContents = event.sender;
+  const win = BrowserWindow.fromWebContents(webContents);
   const screenSize = screen.getPrimaryDisplay().workAreaSize;
 
-  let newX = win.getPosition()[0]
-  let newY = win.getPosition()[1]
+  let newX = win.getPosition()[0];
+  let newY = win.getPosition()[1];
   webContents.send('petPosition', { x: newX, y: newY });
   return { screenWidth: screenSize.width, screenHeight: screenSize.height };
 }
@@ -110,7 +103,7 @@ function createPetWindow() {
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       nodeIntegration: true,
-      enableRemoteModule: true
+      enableRemoteModule: true,
     },
   });
 
@@ -118,7 +111,6 @@ function createPetWindow() {
   petWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   petWindow.setAlwaysOnTop(true, 'screen-saver', 1);
   petWindow.setIgnoreMouseEvents(true);
-  // petWindow.webContents.openDevTools({mode: 'detach'});
 }
 
 function createChatboxInputWindow() {
@@ -134,14 +126,13 @@ function createChatboxInputWindow() {
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       nodeIntegration: true,
-      enableRemoteModule: true
+      enableRemoteModule: true,
     },
   });
 
   chatboxInputWindow.loadFile("chatbox-input.html");
   chatboxInputWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   chatboxInputWindow.setAlwaysOnTop(true, 'screen-saver', 1);
-  // chatboxInputWindow.webContents.openDevTools({mode: "detach"});
 }
 
 function createChatboxResponseWindow() {
@@ -157,33 +148,32 @@ function createChatboxResponseWindow() {
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       nodeIntegration: true,
-      enableRemoteModule: true
+      enableRemoteModule: true,
     },
   });
 
   chatboxResponseWindow.loadFile("chatbox-response.html");
   chatboxResponseWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   chatboxResponseWindow.setAlwaysOnTop(true, 'screen-saver', 1);
-  // chatboxResponseWindow.webContents.openDevTools({mode: 'detach'});
 
   return chatboxResponseWindow;
 }
 
 function showMessage(message) {
   if (petWindow.getPosition()[0] + getPetWindowSize().width / 2 < screen.getPrimaryDisplay().workAreaSize.width / 2) {
-    petOrientation = 1
+    petOrientation = 1;
   } else {
-    petOrientation = -1
+    petOrientation = -1;
   }
 
   chatboxResponseWindow.webContents.send("message", {
     text: message,
-    orientation: petOrientation
-  })
+    orientation: petOrientation,
+  });
   petWindow.webContents.send("message", {
     text: "response-open",
-    orientation: petOrientation
-  })
+    orientation: petOrientation,
+  });
 
   chatboxResponseWindow.hide();
 
@@ -191,39 +181,30 @@ function showMessage(message) {
     width: 800 * config.SCALE,
     height: 400 * config.SCALE,
     x: petWindow.getPosition()[0] - (700 * config.SCALE),
-    y: petWindow.getPosition()[1] - (300 * config.SCALE)
+    y: petWindow.getPosition()[1] - (300 * config.SCALE),
   });
   chatboxResponseWindow.show();
 }
 
-var processingMessage = false
+var processingMessage = false;
 
-function handleSubmitMessage(event, type, message) {
+async function handleSubmitMessage(event, type, message) {
   const webContents = event.sender;
   const win = BrowserWindow.fromWebContents(webContents);
 
   if (type === "input") {
-
-    processingMessage = true
+    processingMessage = true;
     petWindow.webContents.send("message", {
       text: "processing-message",
-      orientation: petOrientation
-    })
+      orientation: petOrientation,
+    });
 
     win.hide();
-    conversation(message)
-    .then(
-      response => {
-        processingMessage = false
-        showMessage(response.data)
-      }
-    )
-    .catch(error => {
-      // Handle error
-      console.error('Error fetching conversation:', error);
-    });
-  }
-  else if (type === "response-size") {
+
+    const audioPath = await convertTextToSpeech(message);
+    playAudioResponse(audioPath);
+    processingMessage = false;
+  } else if (type === "response-size") {
     const width = Math.ceil(message.width);
     const height = Math.ceil(message.height);
 
@@ -232,17 +213,18 @@ function handleSubmitMessage(event, type, message) {
       responsePositionX = Math.max(0,
         Math.min(
           petWindow.getPosition()[0] + getPetWindowSize().width - (50 * config.SCALE),
-          screen.getPrimaryDisplay().workAreaSize.width - width),
+          screen.getPrimaryDisplay().workAreaSize.width - width
+        )
       );
-    }
-    else {
+    } else {
       responsePositionX = Math.max(0,
         Math.min(
           petWindow.getPosition()[0] - width + 70,
-          screen.getPrimaryDisplay().workAreaSize.width - width),
-      );  
+          screen.getPrimaryDisplay().workAreaSize.width - width
+        )
+      );
     }
-    
+
     const responsePositionY = petWindow.getPosition()[1] - height + (50 * config.SCALE);
     chatboxResponseWindow.setBounds({
       width: width,
@@ -252,17 +234,45 @@ function handleSubmitMessage(event, type, message) {
     });
 
     chatboxResponseWindow.show();
-  }
-  else if (type === "response-close") {
+  } else if (type === "response-close") {
     win.hide();
     petWindow.webContents.send("message", { text: "response-close" });
-  };
-
+  }
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
+async function convertTextToSpeech(text) {
+  const form = new FormData();
+  form.append("text", text);
+  form.append("voice_settings", JSON.stringify({ pitch: 0.5, speed: 1.0 }));
+
+  const options = {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${ELEVENLABS_API_KEY}`,
+      ...form.getHeaders(),
+    },
+    data: form,
+    url: `https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`,
+    responseType: 'stream',
+  };
+
+  const response = await axios(options);
+
+  const outputPath = path.join(__dirname, 'response_audio.mp3');
+  const writer = fs.createWriteStream(outputPath);
+  response.data.pipe(writer);
+
+  return new Promise((resolve, reject) => {
+    writer.on('finish', () => resolve(outputPath));
+    writer.on('error', reject);
+  });
+}
+
+function playAudioResponse(audioPath) {
+  const audio = new Audio(audioPath);
+  audio.play();
+}
+
 app.whenReady().then(() => {
   ipcMain.on('submit-message', handleSubmitMessage);
   ipcMain.handle('pet-step', petStepHandler);
@@ -273,34 +283,21 @@ app.whenReady().then(() => {
   createChatboxResponseWindow();
 
   globalShortcut.register('CommandOrControl+L', () => {
-    if (processingMessage) return
+    if (processingMessage) return;
 
-    if (chatboxInputWindow.isVisible()) {
-      chatboxInputWindow.hide();
-    } else {
-      chatboxInputWindow.webContents.send("show");
-      chatboxInputWindow.show();
-    }
-  })
+    chatboxInputWindow.webContents.send("start-voice-command");
+    chatboxInputWindow.show();
+  });
 
   app.on("activate", function () {
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
 app.on("window-all-closed", function () {
   if (process.platform !== "darwin") app.quit();
 });
 
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.
-
 app.on('will-quit', () => {
-  // Unregister all shortcuts.
-  globalShortcut.unregisterAll()
-})
+  globalShortcut.unregisterAll();
+});
